@@ -11,8 +11,8 @@ terraform {
 }
 
 module "vpc" {
-  source = "terraform-aws-modules/vpc/aws"
-  version = "~> 3.14"
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 4.0" # Use the latest version
 
   name = "my-vpc"
   cidr = "10.0.0.0/16"
@@ -25,19 +25,19 @@ module "vpc" {
   enable_vpn_gateway = true
 
   tags = {
-    Terraform = "true"
+    Terraform   = "true"
     Environment = "dev"
   }
 }
-resource "aws_eip" "nat" {
-  count = 3
 
+resource "aws_eip" "nat" {
+  count  = 3
   domain = "vpc"
 }
 
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
-  version         = "~> 14.0"
+  version         = "~> 18.0" # Use the latest version
   cluster_version = "1.27"
   cluster_name    = "quotes-generator-cluster"
   vpc_id          = module.vpc.vpc_id
