@@ -41,14 +41,14 @@ module "eks" {
   cluster_version = "1.27"
   cluster_name    = "quotes-generator-cluster"
   vpc_id          = module.vpc.vpc_id
-  subnets         = module.vpc.private_subnets
+  subnet_ids      = module.vpc.private_subnets
 
-  node_groups = {
-    eks_nodes = {
-      desired_capacity = 2
-      max_capacity     = 3
-      min_capacity     = 1
-      instance_type    = "t2.micro"
+  eks_managed_node_groups = {
+
+    node_group = {
+      min_size     = 2
+      max_size     = 6
+      desired_size = 2
     }
   }
 }
