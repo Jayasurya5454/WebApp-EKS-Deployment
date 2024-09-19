@@ -70,13 +70,19 @@ resource "kubernetes_manifest" "quotes_service" {
   manifest = yamldecode(file("${path.module}/quotes-service.yaml"))
 }
 
-data "external" "quotes_service_ip" {
-  program = ["bash", "-c", <<EOT
-    kubectl get svc quotes-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' | tr -d '\n'
-  EOT
-  ]
+resource "null_resource" "wait_for_load_balancer" {
+  provisioner "local-exec" {
+    command = <<EOT
+      kubectl get svc quotes-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' > quotes_service_ip.txt
+    EOT
+  }
+}
+
+data "local_file" "quotes_service_ip" {
+  depends_on = [null_resource.wait_for_load_balancer]
+  filename = "${path.module}/quotes_service_ip.txt"
 }
 
 output "quotes_service_ip" {
-  value = data.external.quotes_service_ip.result
+  value = data.local_file.quotes_service_ip.content
 }
