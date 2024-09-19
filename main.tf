@@ -44,7 +44,6 @@ module "eks" {
   subnet_ids      = module.vpc.private_subnets
 
   eks_managed_node_groups = {
-
     node_group = {
       min_size     = 2
       max_size     = 6
@@ -54,7 +53,7 @@ module "eks" {
 }
 
 data "aws_eks_cluster_auth" "cluster" {
-  name = module.eks.cluster_id
+  name = module.eks.cluster_name
 }
 
 provider "kubernetes" {
@@ -71,12 +70,13 @@ resource "kubernetes_manifest" "quotes_service" {
   manifest = yamldecode(file("${path.module}/quotes-service.yaml"))
 }
 
-resource "null_resource" "wait_for_load_balancer" {
-  provisioner "local-exec" {
-    command = "kubectl get svc quotes-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
-  }
+data "external" "quotes_service_ip" {
+  program = ["bash", "-c", <<EOT
+    kubectl get svc quotes-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' | tr -d '\n'
+  EOT
+  ]
 }
 
 output "quotes_service_ip" {
-  value = null_resource.wait_for_load_balancer.stdout  # Access the output of the provisioner
+  value = data.external.quotes_service_ip.result
 }
