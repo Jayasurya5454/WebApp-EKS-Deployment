@@ -30,55 +30,36 @@ module "vpc" {
   }
 }
 
-resource "aws_iam_role" "example" {
-  name = "example-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action    = "sts:AssumeRole"
-        Effect    = "Allow"
-        Principal = {
-          Service = "eks.amazonaws.com"
-        }
-      }
-    ]
-  })
+resource "aws_eip" "nat" {
+  count  = 3
+  domain = "vpc"
 }
 
-resource "aws_iam_role_policy_attachment" "example-AmazonEKSClusterPolicy" {
-  role      = aws_iam_role.example.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-}
+module "eks" {
+  source          = "terraform-aws-modules/eks/aws"
+  version         = "~> 18.0" # Use the latest version
+  cluster_version = "1.27"
+  cluster_name    = "quotes-generator-cluster"
+  vpc_id          = module.vpc.vpc_id
+  subnet_ids      = module.vpc.private_subnets
 
-resource "aws_iam_role_policy_attachment" "example-AmazonEKSVPCResourceController" {
-  role      = aws_iam_role.example.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
-}
-
-resource "aws_eks_cluster" "quotes_app_deploy" {
-  name     = "quotes-app-deploy"
-  role_arn = aws_iam_role.example.arn
-
-  vpc_config {
-    subnet_ids = module.vpc.private_subnets
+  eks_managed_node_groups = {
+    node_group = {
+      min_size     = 2
+      max_size     = 6
+      desired_size = 2
+    }
   }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.example-AmazonEKSClusterPolicy,
-    aws_iam_role_policy_attachment.example-AmazonEKSVPCResourceController,
-  ]
 }
 
-data "aws_eks_cluster_auth" "auth" {
-  name = aws_eks_cluster.quotes_app_deploy.name
+data "aws_eks_cluster_auth" "cluster" {
+  name = module.eks.cluster_id
 }
 
 provider "kubernetes" {
-  host                   = aws_eks_cluster.quotes_app_deploy.endpoint
-  cluster_ca_certificate = base64decode(aws_eks_cluster.quotes_app_deploy.certificate_authority[0].data)
-  token                  = data.aws_eks_cluster_auth.auth.token
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  token                  = data.aws_eks_cluster_auth.cluster.token
 }
 
 resource "kubernetes_manifest" "quotes_deployment" {
@@ -87,18 +68,6 @@ resource "kubernetes_manifest" "quotes_deployment" {
 
 resource "kubernetes_manifest" "quotes_service" {
   manifest = yamldecode(file("${path.module}/quotes-service.yaml"))
-}
-
-output "endpoint" {
-  value = aws_eks_cluster.quotes_app_deploy.endpoint
-}
-
-output "kubeconfig-certificate-authority-data" {
-  value = aws_eks_cluster.quotes_app_deploy.certificate_authority[0].data
-}
-
-output "cluster_name" {
-  value = aws_eks_cluster.quotes_app_deploy.name
 }
 
 output "quotes_service_ip" {
