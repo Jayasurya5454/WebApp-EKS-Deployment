@@ -32,7 +32,7 @@ module "vpc" {
 
 resource "aws_eip" "nat" {
   count  = 3
-  domain = "vpc"
+  domain = "vpc" # Use domain attribute
 }
 
 module "eks" {
@@ -78,5 +78,5 @@ resource "null_resource" "wait_for_load_balancer" {
 }
 
 output "quotes_service_ip" {
-  value = null_resource.wait_for_load_balancer.provisioner.result
+  value = null_resource.wait_for_load_balancer.stdout  # Access the output of the provisioner
 }
