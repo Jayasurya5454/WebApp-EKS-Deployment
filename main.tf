@@ -44,7 +44,6 @@ module "eks" {
   subnet_ids      = module.vpc.private_subnets
 
   eks_managed_node_groups = {
-
     node_group = {
       min_size     = 2
       max_size     = 6
@@ -53,14 +52,18 @@ module "eks" {
   }
 }
 
-data "aws_eks_cluster_auth" "cluster" {
+data "aws_eks_cluster" "cluster" {
+  name = module.eks.cluster_id
+}
+
+data "aws_eks_cluster_auth" "auth" {
   name = module.eks.cluster_id
 }
 
 provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-  token                  = data.aws_eks_cluster_auth.cluster.token
+  host                   = data.aws_eks_cluster.cluster.endpoint
+  cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority[0].data)
+  token                  = data.aws_eks_cluster_auth.auth.token
 }
 
 resource "kubernetes_manifest" "quotes_deployment" {
