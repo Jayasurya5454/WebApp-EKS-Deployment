@@ -63,26 +63,68 @@ provider "kubernetes" {
 }
 
 resource "kubernetes_manifest" "quotes_deployment" {
-  manifest = yamldecode(file("${path.module}/quotes-deployment.yaml"))
-}
-
-resource "kubernetes_manifest" "quotes_service" {
-  manifest = yamldecode(file("${path.module}/quotes-service.yaml"))
-}
-
-resource "null_resource" "wait_for_load_balancer" {
-  provisioner "local-exec" {
-    command = <<EOT
-      kubectl get svc quotes-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' > quotes_service_ip.txt
-    EOT
+  manifest = {
+    apiVersion = "apps/v1"
+    kind       = "Deployment"
+    metadata = {
+      name   = "quotes"
+      labels = {
+        app = "quotes"
+      }
+    }
+    spec = {
+      replicas = 2
+      selector = {
+        matchLabels = {
+          app = "quotes"
+        }
+      }
+      template = {
+        metadata = {
+          labels = {
+            app = "quotes"
+          }
+        }
+        spec = {
+          containers = [
+            {
+              name  = "quotes"
+              image = "jayasurya5454/quotes:latest"
+              ports = [
+                {
+                  containerPort = 8080
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
   }
 }
 
-data "local_file" "quotes_service_ip" {
-  depends_on = [null_resource.wait_for_load_balancer]
-  filename = "${path.module}/quotes_service_ip.txt"
-}
-
-output "quotes_service_ip" {
-  value = data.local_file.quotes_service_ip.content
+resource "kubernetes_manifest" "quotes_service" {
+  manifest = {
+    apiVersion = "v1"
+    kind       = "Service"
+    metadata = {
+      name   = "quotes-service"
+      labels = {
+        app = "quotes"
+      }
+    }
+    spec = {
+      selector = {
+        app = "quotes"
+      }
+      ports = [
+        {
+          protocol   = "TCP"
+          port       = 80
+          targetPort = 8080
+        }
+      ]
+      type = "LoadBalancer"
+    }
+  }
 }
