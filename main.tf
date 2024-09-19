@@ -32,7 +32,7 @@ module "vpc" {
 
 resource "aws_eip" "nat" {
   count  = 3
-  domain = "vpc" # Use domain attribute
+  domain = "vpc"
 }
 
 module "eks" {
@@ -44,6 +44,7 @@ module "eks" {
   subnet_ids      = module.vpc.private_subnets
 
   eks_managed_node_groups = {
+
     node_group = {
       min_size     = 2
       max_size     = 6
@@ -53,78 +54,29 @@ module "eks" {
 }
 
 data "aws_eks_cluster_auth" "cluster" {
-  name = module.eks.cluster_name
+  name = module.eks.cluster_id
 }
 
 provider "kubernetes" {
   host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data) 
   token                  = data.aws_eks_cluster_auth.cluster.token
 }
 
 resource "kubernetes_manifest" "quotes_deployment" {
-  manifest = {
-    apiVersion = "apps/v1"
-    kind       = "Deployment"
-    metadata = {
-      name   = "quotes"
-      labels = {
-        app = "quotes"
-      }
-    }
-    spec = {
-      replicas = 2
-      selector = {
-        matchLabels = {
-          app = "quotes"
-        }
-      }
-      template = {
-        metadata = {
-          labels = {
-            app = "quotes"
-          }
-        }
-        spec = {
-          containers = [
-            {
-              name  = "quotes"
-              image = "jayasurya5454/quotes:latest"
-              ports = [
-                {
-                  containerPort = 8080
-                }
-              ]
-            }
-          ]
-        }
-      }
-    }
-  }
+  manifest = yamldecode(file("${path.module}/quotes-deployment.yaml"))
 }
 
 resource "kubernetes_manifest" "quotes_service" {
-  manifest = {
-    apiVersion = "v1"
-    kind       = "Service"
-    metadata = {
-      name   = "quotes-service"
-      labels = {
-        app = "quotes"
-      }
-    }
-    spec = {
-      selector = {
-        app = "quotes"
-      }
-      ports = [
-        {
-          protocol   = "TCP"
-          port       = 80
-          targetPort = 8080
-        }
-      ]
-      type = "LoadBalancer"
-    }
+  manifest = yamldecode(file("${path.module}/quotes-service.yaml"))
+}
+
+resource "null_resource" "wait_for_load_balancer" {
+  provisioner "local-exec" {
+    command = "kubectl get svc quotes-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
   }
+}
+
+output "quotes_service_ip" {
+  value = null_resource.wait_for_load_balancer.provisioner.result
 }
