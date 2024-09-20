@@ -80,10 +80,12 @@ provider "kubernetes" {
 
 resource "kubernetes_manifest" "quotes_deployment" {
   manifest = yamldecode(file("${path.module}/quotes-deployment.yaml"))
+  depends_on = [module.eks]
 }
 
 resource "kubernetes_manifest" "quotes_service" {
   manifest = yamldecode(file("${path.module}/quotes-service.yaml"))
+  depends_on = [kubernetes_manifest.quotes_deployment]
 }
 
 data "kubernetes_service" "quotes_service" {
@@ -91,4 +93,5 @@ data "kubernetes_service" "quotes_service" {
     name      = "quotes-service"
     namespace = "default"
   }
+  depends_on = [kubernetes_manifest.quotes_service]
 }
