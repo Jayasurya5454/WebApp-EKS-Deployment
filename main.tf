@@ -45,10 +45,7 @@ module "vpc" {
   }
 }
 
-resource "aws_eip" "nat" {
-  count  = 3
-  domain = "vpc"
-}
+
 
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
